@@ -1,0 +1,48 @@
+server:
+  port: 9090
+spring:
+  application:
+    name: service-gateway
+  config:
+    import: optional:configserver:http://ms-config-server:8888
+  cloud:
+    gateway:
+      default-filters:
+      - name: SCGWGlobalFilter
+      routes:
+        - id: ms-client
+          uri: http://localhost:8080/
+          predicates:
+            - Path=/api/clients/**
+        - id: ms-loan
+          uri: http://localhost:8092/
+          predicates:
+            - Path=/api/loans/**
+        - id: ms-movement
+          uri: http://localhost:8083/
+          predicates:
+            - Path=/api/movements/**
+        - id: ms-credits
+          uri: http://localhost:8084/
+          predicates:
+            - Path=/api/credits/**
+        - id: ms-bank-account
+          uri: http://localhost:8085/
+          predicates:
+            - Path=/api/bankaccounts/**
+        - id: debit-card
+          uri: http://localhost:8086/
+          predicates:
+            - Path=/api/debitcard/**
+        - id: ms-person-type
+          uri: http://localhost:8087/
+          predicates:
+            - Path=/api/persontype/**
+        - id: ms-account-type
+          uri: http://localhost:8091/
+          predicates:
+            - Path=/api/accounttype/**
+        - id: ms-currency-type
+          uri: http://localhost:8089/
+          predicates:
+            - Path=/api/currencytype/**
