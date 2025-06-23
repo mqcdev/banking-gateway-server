@@ -23,11 +23,11 @@ public class GatewayConfig {
     public RouteLocator routes(RouteLocatorBuilder builder) {
         return builder.routes()
                 // Microservicios existentes
-                .route("service-client", r -> r.path("/api/clients/**")
+                .route("ms-client", r -> r.path("/api/clients/**")
                         .filters(f -> f.filter(jwtAuthFilter.apply(new JwtAuthenticationFilter.Config()
                                 .setPublicEndpoints(PUBLIC_ENDPOINTS))))
                         .uri("http://ms-client:8080/"))
-                .route("authservice", r -> r.path("/api/v1/authentication/**")
+                .route("ms-auth", r -> r.path("/api/v1/authentication/**")
                         .filters(f -> f.filter(jwtAuthFilter.apply(new JwtAuthenticationFilter.Config()
                                 .setPublicEndpoints(PUBLIC_ENDPOINTS))))
                         .uri("http://ms-auth:1112/"))
