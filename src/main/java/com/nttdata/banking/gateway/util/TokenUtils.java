@@ -1,17 +1,13 @@
-package com.nttdata.banking.gateway.model;
+package com.nttdata.banking.gateway.util;
 
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
+/**
+ * Clase de utilidades para manejo de tokens JWT y encabezados de autorización.
+ */
+public class TokenUtils {
 
-@Getter
-@Setter
-@Builder
-public class Token {
-    private String accessToken;
-    private long accessTokenExpiresAt;
-    private String refreshToken;
-    private long refreshTokenExpiresAt;
+    private TokenUtils() {
+        // Constructor privado para evitar instanciación
+    }
 
     /**
      * Verifica si el encabezado contiene un token Bearer.

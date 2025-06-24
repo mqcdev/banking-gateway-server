@@ -1,18 +1,16 @@
 package com.nttdata.banking.gateway.filters;
 
-import com.nttdata.banking.gateway.client.UserServiceClient;
 import com.nttdata.banking.gateway.model.Token;
-import feign.FeignException;
+import com.nttdata.banking.gateway.service.InvalidTokenService;
+import com.nttdata.banking.gateway.service.TokenService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
-import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 
@@ -20,8 +18,11 @@ import java.util.List;
 public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAuthenticationFilter.Config> {
     private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
-    public JwtAuthenticationFilter() {
+    private final TokenService tokenService;
+
+    public JwtAuthenticationFilter(TokenService tokenService) {
         super(Config.class);
+        this.tokenService = tokenService;
     }
 
     public static class Config {
@@ -51,28 +52,22 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
             if (Token.isBearerToken(authorizationHeader)) {
                 String jwt = Token.getJwt(authorizationHeader);
 
-                ApplicationContext context = exchange.getApplicationContext();
-                UserServiceClient userServiceClient = context.getBean(UserServiceClient.class);
-
-                return Mono.fromCallable(() -> {
-                            userServiceClient.validateToken(jwt);
+                // Solo verificamos que el token sea válido sintácticamente
+                return tokenService.verifyAndValidate(jwt)
+                        .flatMap(valid -> {
                             logger.debug("Token validation succeeded for path: {}", path);
-                            return true;
+                            return chain.filter(exchange);
                         })
-                        .subscribeOn(Schedulers.boundedElastic())
-                        .flatMap(valid -> chain.filter(exchange))
                         .onErrorResume(e -> {
                             logger.error("Token validation failed for path: {}", path, e);
-                            if (e instanceof FeignException.Unauthorized || e instanceof FeignException.Forbidden) {
-                                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-                            } else {
-                                exchange.getResponse().setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR);
-                            }
+                            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
                             return exchange.getResponse().setComplete();
                         });
             }
+
             logger.warn("Missing or invalid Authorization header for path: {}", path);
-            return chain.filter(exchange);
+            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+            return exchange.getResponse().setComplete();
         };
     }
 }
