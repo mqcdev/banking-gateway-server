@@ -1,8 +1,7 @@
 package com.nttdata.banking.gateway.filters;
 
-import com.nttdata.banking.gateway.model.Token;
-import com.nttdata.banking.gateway.service.InvalidTokenService;
-import com.nttdata.banking.gateway.service.TokenService;
+import com.nttdata.banking.gateway.service.TokenValidationService;
+import com.nttdata.banking.gateway.util.TokenUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
@@ -18,11 +17,11 @@ import java.util.List;
 public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAuthenticationFilter.Config> {
     private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
-    private final TokenService tokenService;
+    private final TokenValidationService tokenValidationService;
 
-    public JwtAuthenticationFilter(TokenService tokenService) {
+    public JwtAuthenticationFilter(TokenValidationService tokenValidationService) {
         super(Config.class);
-        this.tokenService = tokenService;
+        this.tokenValidationService = tokenValidationService;
     }
 
     public static class Config {
@@ -42,24 +41,35 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
     public GatewayFilter apply(Config config) {
         return (exchange, chain) -> {
             String path = exchange.getRequest().getURI().getPath();
+            logger.info("Processing request for path: {}", path);
 
-            if (config != null && config.getPublicEndpoints().stream().anyMatch(path::startsWith)) {
+            // Verificar si la ruta es pública
+            if (config != null && config.getPublicEndpoints() != null &&
+                    config.getPublicEndpoints().stream().anyMatch(path::startsWith)) {
+                logger.info("Public endpoint detected, skipping authentication for path: {}", path);
                 return chain.filter(exchange);
             }
 
             String authorizationHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+            logger.info("Authorization header: {}", authorizationHeader != null ? "Present" : "Missing");
 
-            if (Token.isBearerToken(authorizationHeader)) {
-                String jwt = Token.getJwt(authorizationHeader);
+            if (TokenUtils.isBearerToken(authorizationHeader)) {
+                String jwt = TokenUtils.getJwt(authorizationHeader);
+                logger.info("JWT token extracted, validating...");
 
-                // Solo verificamos que el token sea válido sintácticamente
-                return tokenService.verifyAndValidate(jwt)
-                        .flatMap(valid -> {
-                            logger.debug("Token validation succeeded for path: {}", path);
-                            return chain.filter(exchange);
+                return tokenValidationService.validateToken(jwt)
+                        .flatMap(isValid -> {
+                            if (isValid) {
+                                logger.info("Token validation successful for path: {}", path);
+                                return chain.filter(exchange);
+                            } else {
+                                logger.warn("Token validation failed for path: {}", path);
+                                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                                return exchange.getResponse().setComplete();
+                            }
                         })
                         .onErrorResume(e -> {
-                            logger.error("Token validation failed for path: {}", path, e);
+                            logger.error("Token validation error for path: {}", path, e);
                             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
                             return exchange.getResponse().setComplete();
                         });
