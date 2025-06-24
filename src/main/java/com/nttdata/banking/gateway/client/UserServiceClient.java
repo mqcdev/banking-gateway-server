@@ -15,7 +15,7 @@ public class UserServiceClient {
     private final WebClient webClient;
 
     public UserServiceClient(WebClient.Builder webClientBuilder) {
-        this.webClient = webClientBuilder.baseUrl("http://localhost:8080/api/clients").build();
+        this.webClient = webClientBuilder.baseUrl("http://ms-client:8080/api/clients").build();
     }
 
     public Mono<Boolean> existsUserEntityByEmail(String email) {
